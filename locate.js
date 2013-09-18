@@ -10,9 +10,13 @@ define(function () {
         load: function (name, req, onload, config) {
             if (name === "registry") {
                 return onload({
-                    register: function (name, service) {
+                    register: function (name, service, isModuleId) {
+                        isModuleId = isModuleId || false;
                         var services = registry[name] || (registry[name] = []);
-                        services.push(service);
+                        services.push({
+                            module: service,
+                            isModuleId: isModuleId
+                        });
                         return this; // todo: or return an unregister handle?
                     },
                     unregister: function (name, service) {
@@ -28,7 +32,16 @@ define(function () {
                 services = registry[name];
 
                 if (services.length === 1) {
-                    onload(services[0]);
+                    var service = services[0];
+                    if (service.isModuleId) {
+                        req([service.module], function(module) {
+                            services[0].isModuleId = false;
+                            services[0].module = module;
+                            onload(module);
+                        });
+                    } else {
+                        onload(service.module);
+                    }
                 } else {
                     var err = new Error("Exactly one service instance expected");
                     err.locateServiceName = name;
@@ -37,8 +50,42 @@ define(function () {
                 }
             } else {
                 services = registry[tokens[0]];
-                // todo: add filtering by query in tokens[1]
-                onload(services);
+                var notLoaded = 0;
+                var serviceModules = [];
+                for (var i = 0; i < services.length; i++) {
+                    if (services[i].isModuleId) {
+                        notLoaded++;
+                        loadModule(i);
+                        
+                        function loadModule(i) {
+                            req([services[i].module], function(module) {
+                                services[i].isModuleId = false;
+                                services[i].module = module;
+                                serviceModules.push(services[i].module);
+                                
+                                notLoaded--;
+                            });
+                        }
+                    } else {
+                        serviceModules.push(services[i].module);
+                    }
+                }
+                
+                var checkLoaded = function() {
+                    if (notLoaded > 0) {
+                        setTimeout(checkLoaded, 0);
+                        return;
+                    }
+                    
+                    onload(serviceModules);
+                };
+                
+                if (notLoaded > 0) {
+                    checkLoaded();
+                } else {
+                    // todo: add filtering by query in tokens[1]
+                    onload(serviceModules);
+                }
             }
         }
     };

@@ -15,15 +15,20 @@ define([ "locate!registry" ], function (registry) {
     registry.register("basket", { contents: [] });
     // Registering a second basket will cause an error since a single basket is expected below
     //registry.register("basket", { contents: [] });
+	
+	registry.register("test", "test", true);
+    registry.register("test", "test", true);
 
     // Locate all apples and a basket
     // A ? at the end implies we want an array of services
-    require([ "locate!apple?", "locate!basket" ], function (apples, basket) {
+    require([ "locate!apple?", "locate!basket", "locate!test?" ], function (apples, basket, test) {
         Array.prototype.push.apply(basket.contents, apples);
 
         // The basket should contain all apples
         console.dir(apples);
         // The basket should contain all apples
         console.dir(basket);
+		// The test module should have been loaded asynchronously, without being defined prior
+		console.dir(test);
     });
 });
